@@ -1,0 +1,145 @@
+#header_search {
+	position: relative;
+}
+
+#header_search img {
+	position: absolute;
+	bottom: 0;
+}
+
+.perc50_viewportHeight {
+	height: 50vh;
+}
+
+.pixel50_leftrightMargins {
+	margin-left: 50px;
+	margin-right: 50px;
+}
+
+.pixel200_height { height: 200px; }
+.pixel300_height { height: 300px; }
+.pixel400_height { height: 400px; }
+
+.pixel15_topbottomMargins {
+	margin-bottom: 15px;
+	margin-top: 15px;
+}
+
+.smile_string {
+	overflow: visible; 
+	white-space: normal; 
+	width: auto;
+	word-break: break-all;
+}
+
+.dataTable {
+	border-collapse: separate;
+	border-color: black;
+	border-style: solid;
+	border-spacing: 0;
+}
+
+#chemicalInfo_superTable {
+	height: 100%;
+	width: 100%;
+}
+
+#infoTables table tbody tr:hover { background-color: #ccc; }
+#infoTables table tbody tr.selected { background-color: yellow; }
+
+#chemical_picture {
+	height: 100%;
+}
+#info_control {
+	height: 100%;
+	overflow: hidden;
+}
+.box {
+    background: none repeat scroll 0 0 white;
+    border-color: #071419;
+    border-radius: 12px 12px 12px 12px;
+    border-style: solid;
+    border-width: 1.5px;
+}
+.paging_full_numbers a.paginate_button {
+	background-color: #DDDDDD;
+}
+.paging_full_numbers a.paginate_button, .paging_full_numbers a.paginate_active {
+	border: 1px solid #AAAAAA;
+	color: #333333 !important;
+	cursor: pointer;
+	margin: 0 3px;
+	padding: 2px 5px;
+}
+
+/*
+ * Sort arrow icon positioning
+ */
+table.dataTable thead .sorting_asc,
+table.dataTable thead .sorting_desc,
+table.dataTable thead .sorting {
+  cursor: pointer;
+  *cursor: hand;
+}
+table.dataTable thead .sorting {
+  background: url("../images/sort_both.png") no-repeat center right;
+}
+table.dataTable thead .sorting_asc {
+  background: url("../images/sort_asc.png") no-repeat center right;
+}
+table.dataTable thead .sorting_desc {
+  background: url("../images/sort_desc.png") no-repeat center right;
+}
+table.dataTable thead .sorting_asc_disabled {
+  background: url("../images/sort_asc_disabled.png") no-repeat center right;
+}
+table.dataTable thead .sorting_desc_disabled {
+  background: url("../images/sort_desc_disabled.png") no-repeat center right;
+}
+
+/*
+#tables {
+	margin: 10px;
+	margin-top: 0;
+	background: #FFF;
+	padding: 5px;
+}
+*/
+
+.datatables_background {
+	margin: 10px;
+	margin-top: 0;
+	background: #FFF;
+	padding: 5px;
+}
+
+#bottom {
+	background:#111;
+	padding: 5px;
+}
+
+.idtabs_background {
+	background:#111;
+	padding: 5px;
+}
+
+.searchbox {
+	color: #888;
+}
+
+#inputbox {
+	width: 1000px;
+	display: block;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.centered {
+	width: 1000px;
+	display: block;
+	margin-left: auto;
+	margin-right: auto;
+}
+.missFDRCutoff {
+	background-color:LightGray;
+}

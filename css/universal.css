@@ -1,0 +1,15 @@
+.scroll{overflow:auto;}
+.height100{height: 100px;}
+.height200{height: 200px;}
+.height300{height: 300px;}
+.height400{height: 400px;}
+.height500{height: 500px;}
+.leftFloat {
+	float: left;
+	position: relative;
+}
+
+.rightFloat {
+	float: right;
+	position: relative;
+}

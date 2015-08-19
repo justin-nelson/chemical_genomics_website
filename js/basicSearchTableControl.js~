@@ -1,0 +1,711 @@
+///////////////////////////////////////////////////////////////
+// Options for the script
+///////////////////////////////////////////////////////////////
+TABLE_CONTROL_DIV = "#table_control";
+CHEMICAL_PICTURE_DIV = "#chemical_picture";
+TABLE_DIV = "#tables";
+BOTTOM_DIV = "#bottom";
+
+FDR_P_VALUE_CUTOFF = 0.00028
+//////////////////////////////////////////////////////////////
+// Variables for the script
+///////////////////////////
+infoDataTable = "";
+tables = []
+tables.current = "";
+
+///////////////
+// Newest solution to keeping the data, all of the tables go into an array
+// Table 0 is the chemicalInfo table, the rest are holding the raw data from the mysql search (basicDatabaseSearch.js)
+// NOTE: The data is no longer held in here explicitly. It is now held on the server and retrieved from there. Thanks datatables.
+///////////////////////////
+tables[0] = {data:"", dataTable:"", tableDiv:"#chemicalInfo_table", div:"#info_control", ssSource:"regular", type:"INFO", columns:[ { "sType": "allnumeric", "aTargets": [2, 3] } ]}; // Chemical INFO
+
+tables[1] = {data:"", dataTable:"", tableDiv:"#processPrediction_table", div:"#processPrediction_div", ssSource:"php/AJAX_processPrediction_serverSideSearch.php", type:"PROCPRED", columns:[]}; // Process Predictions
+tables[2] = {data:"", dataTable:"", tableDiv:"#chemicalSimilarity_table", div:"#chemicalSimilarity_div", ssSource:"php/AJAX_chemicalSimilarity_serverSideSearch.php", type:"CHEMSIMI", columns:[]}; // Chemical ENR MC RESI
+tables[3] = {data:"", dataTable:"", tableDiv:"#profileSimilarity_table", div:"#profileSimilarity_div", ssSource:"php/AJAX_profileSimilarity_serverSideSearch.php", type:"PROFSIMI", columns:[]}; // Chemical ENR MC RESI
+tables[4] = {data:"", dataTable:"", tableDiv:"#genePrediction_table", div:"#genePrediction_div", ssSource:"php/AJAX_genePrediction_serverSideSearch.php", type:"GENEPRED", columns:[]}; // Process Predictions
+tables[5] = {data:"", dataTable:"", tableDiv:"#chemicalGenetics_table", div:"#chemicalGenetics_div", ssSource:"php/AJAX_chemicalGenetics_serverSideSearch.php", type:"CHEMGENE", columns:[]}; // Chemical GEN
+
+
+
+///////////////////////////////
+// Expand/Contract Info Table
+// Expands or Contracts the info table
+//////////////////////////////////
+function expandInfoTable(){
+	selection = $('#chemicalInfo_table').find('tr.selected').attr('name');
+	currentTable = tables.current;
+	createChemicalInfoTable('295px', selection, currentTable);
+	//$("#chemical_picture").height($("#chemicalInfo_superTable").height() - 50);
+	$("#chemical_picture").height(400);
+	$("#expandContract").html('<a onclick="contractInfoTable()">contract...</a>');
+}
+function contractInfoTable(){
+	selection = $('#chemicalInfo_table').find('tr.selected').attr('name');
+	currentTable = tables.current;
+	createChemicalInfoTable('95px', selection, currentTable);
+	$("#chemical_picture").height(200);
+	$("#expandContract").html('<a onclick="expandInfoTable()">expand...</a>');
+}
+
+
+///////////////////////////////////////////////////////////////
+// setupChemicalInfoTable (override basicDatabaseSearch:setupInfoTable)
+// This function will setup the info table, which will then be used to control which data is displayed in other tables
+//////////////////////////////////////////////
+function setupChemicalInfoTable(){	
+	destroyCurrentTable(); // Destroy the current data table
+	unloadAllTableData(); // Clear the data currently in the dataTables including info table
+	hideAllTableDivs(); // Hide the data tables
+	createChemicalInfoTable('400px', 0, 1);
+	showTableControls();
+	expandInfoTable()
+}
+
+function createChemicalInfoTable(height, selection, currentTable){
+	destroyTable(0); // Destroy the DataTable for the chemical info
+	loadChemicalInfoTable(0); // 0 is the index for the info table
+	tables[0].dataTable = convertToDataTable(0, height);
+	showTable(0); // Show the info table
+	fixDataTableHeader(0); // Make sure the header is properly aligned
+	setupInfoTableClick(0);
+	selectChemicalInfoTable(selection, currentTable);
+	$("#chemical_picture").height($("#chemicalInfo_superTable").height() - 50);
+}
+
+function selectChemicalInfoTable(selection, currentTable){
+	$('#chemicalInfo_table').find('tr[name="'+selection+'"]').addClass("selected");
+	loadDatabaseTables(selection, currentTable);
+}
+///////////////////////////////////////////////////////////////
+// Create table
+// Functions designed to create and manage the datatables
+////////////////////////////////////////////////////////////
+function createTable(index){
+	destroyCurrentTable();
+	tables.current = index;
+	tables[index].dataTable = convertToDataTable(index, '300px');
+	hideAllTableDivs();
+	showTable(index);
+	tables[index].dataTable.fnAdjustColumnSizing();
+}
+
+/////////////////////////////////////////////////////////////////
+// convertToDataTable()
+// converts an existing table into a datatable
+////////////////////////////////////////////////////////
+currentChemical = "";
+currentMultiplex = "";
+currentLane = "";
+currentReplicate = "";
+function convertToDataTable(index, size){
+	destroyTable(index);
+	if(tables[index].ssSource == "regular" || tables[index].ssSource == undefined || tables[index].ssSource == ""){
+		var dataTable = $(tables[index].tableDiv).dataTable({
+			"sScrollY": size,
+			"bPaginate": false,
+			"bScrollCollapse": true,
+			"bLengthChange": false,
+			"bInfo": false,
+			//"sPaginationType": "full_numbers",
+			"aoColumnDefs": tables[index].columns,
+		});
+	} else {
+		// This will add classes to the rows as they come in
+		rowCreated_fn = function( nRow, aData, iDisplayIndex ) { return nRow; }
+		if(tables[index].type == "PROCPRED"){
+			rowCreated_fn = function( nRow, aData, iDisplayIndex ) {
+				if(aData[3] * 1 >= FDR_P_VALUE_CUTOFF){
+					nRow.className = 'missFDRCutoff';
+					return nRow;
+				}
+			}
+		}
+
+
+		var dataTable = $(tables[index].tableDiv).dataTable( {
+			"fnRowCallback": rowCreated_fn,
+			"sScrollY": size,
+			"sAjaxSource": tables[index].ssSource,
+			"bServerSide": true,
+			"sDom": "frtiS",
+			"oScroller": {
+				"loadingIndicator": true
+			},
+			"aoColumnDefs": tables[index].columns,
+			"fnServerParams": function ( aoData ) {
+				aoData.push( { "name": "chemical", "value": currentChemical } );
+				aoData.push( { "name": "multiplex", "value": currentMultiplex } );
+				aoData.push( { "name": "lane", "value": currentLane } );
+				aoData.push( { "name": "replicate", "value": currentReplicate } );
+				aoData.push( { "name": "searchType", "value": currentSearchType } );
+			},
+			
+		} );
+	}
+
+	return dataTable;	
+}
+/////////////////////////////////////////////////
+// Functions to be run when this script is loaded
+/////////////////////////
+$(window).resize(function() {
+	if(this.resizeTO) clearTimeout(this.resizeTO);
+	this.resizeTO = setTimeout(function() {
+		if(tables.current != ""){ tables[tables.current].dataTable.fnAdjustColumnSizing(); }
+		//$(this).trigger('resizeEnd');
+	}, 100);
+});
+
+///////////////////////////////////////////////////////////////
+// loadScatterplots(index)
+// unloadScatterplots()
+// showScatterplots()
+// hideScatterPlots()
+// These functions control the scatterplots
+////////////////////////////////////////////////
+function loadScatterplots(index){
+	str = '';
+	if(index != 'ALL'){
+		pic_prefix = 'scatterplots/'+tables[0].data[index]['lane']+'/'+tables[0].data[index]['pic_num'];
+		str = str + '<img src="'+pic_prefix+'_0.png">';
+		str = str + '<img src="'+pic_prefix+'_1.png"><br>';
+		str = str + '<img src="'+pic_prefix+'_2.png">';
+		str = str + '<img src="'+pic_prefix+'_3.png">';
+	}
+	$("#scatterplots").html(str);
+}
+
+function unloadScatterplots(){
+	$("#scatterplots").html("");
+}
+
+function showScatterplots(){
+	destroyCurrentTable();
+	tables.current = "";
+	hideAllTableDivs();
+	$("#scatterplots").show();
+}
+
+function hideScatterPlots(){
+	$("#scatterplots").hide();
+}
+///////////////////////////////////////////////////////////////
+// loadResults (override basicDatabaseSearch:loadResults)
+// unloadResults
+// This function will handle the results from a database search
+// It will execute checkFunction to check to see if the results are good before loading them in
+////////////////////////////////////////////////
+function loadResults(results, checkFunction){
+	//for(var i=0; i<tables.length; i++){
+	//	if(!checkFunction(results[i])){ tables[i].data = results[i];}
+	//}
+	i = 0;
+	if(!checkFunction(results[i])){ tables[i].data = results[i];}
+
+}
+function unloadResults(){
+	for(var i=0; i<tables.length; i++){
+		tables[i].data = '';
+	}
+}
+
+//////////////
+// LoadChemicalInfoTable
+// Load in the actual data data into the table
+//////////////////////
+function loadChemicalInfoTable(index){
+	str = ''; // Start Creating the table
+
+	// Manually include an all :: This is not needed anymore, All is now processed during the search and appended onto the front of the array
+	//str = str + '<tr name="all"><td name="chemicalName">'+tables[index].data[0].chemical_name+'</td><td name="chemicalMultiplex">ALL</td><td name="lane">ALL</td><td name="replicate">ALL</td></tr>';
+
+	// Create Table
+	curIndex = 0;
+	for (var i in tables[index].data){
+		str = str + '<tr name="'+curIndex+'">';
+			//str = str + '<td name="structure" align="center">' + "<img src='structures/" + tables[index].data[i].structure_pic +"' height='100px' width='100px' /></td>";
+			str = str + '<td name="chemicalName">' + tables[index].data[i].chemical_name + '</td>';
+			str = str + '<td name="chemicalMultiplex">' + tables[index].data[i].chemical_multiplex + '</td>';
+			str = str + '<td name="lane">' + tables[index].data[i].lane + '</td>';
+			str = str + '<td name="replicate">' + tables[index].data[i].replicate + '</td>';
+		str = str + '</tr>';
+		curIndex = curIndex+1;
+	}
+
+	$(tables[index].tableDiv).find("tbody").html(str); // Throw down table
+}
+//////////////////////
+// setupInfoTableClick
+// This will set it up so that when the infoTable is clicked, additional data is loaded
+var currentChemical = "";
+var currentMultiplex = "";
+var currentLane = "";
+var currentReplicate = "";
+var currentSearchType = "";
+function setupInfoTableClick(index){
+	$(tables[index].tableDiv).find('tbody tr').click(function() {
+		// Destroy the current table while I load in the new data
+		tmp_currentTable = tables.current;
+		destroyCurrentTable();
+		// Load in the new Data
+		row_index = $(this).attr('name');
+		
+		loadDatabaseTables(row_index, tmp_currentTable);
+		/*if(row_index == "all"){
+			loadChemicalPicture("");
+			loadTableData("ALL", "ALL", "ALL", "ALL");
+			unloadScatterplots();
+
+			currentChemical = tables[0].data[0].chemical_name;
+			currentMultiplex = "ALL";
+			currentLane = "ALL";
+			currentReplicate = "ALL";
+
+			createTable(tmp_currentTable);
+		} else {
+			var picture = tables[0].data[row_index].structure_pic;
+		
+			currentChemical = tables[0].data[row_index].chemical_name;
+			currentMultiplex = tables[0].data[row_index].chemical_multiplex;
+			currentLane = tables[0].data[row_index].lane;
+			currentReplicate = tables[0].data[row_index].replicate;
+
+			loadScatterplots(row_index);
+			loadChemicalPicture(picture);
+			loadTableData(currentChemical, currentMultiplex, currentLane, currentReplicate);
+			createTable(tmp_currentTable); // recreate the table that the website was on
+		}*/
+		$(this).addClass("selected").siblings().removeClass("selected");
+	});
+}
+
+function loadDatabaseTables(row_index, currentTable){
+	picture = tables[0].data[row_index].structure_pic;
+		
+	currentChemical = tables[0].data[row_index].chemical_name;
+	currentMultiplex = tables[0].data[row_index].chemical_multiplex;
+	currentLane = tables[0].data[row_index].lane;
+	currentReplicate = tables[0].data[row_index].replicate;
+	currentSearchType = tables[0].data[row_index].searchType;
+
+	loadScatterplots(row_index);
+	loadChemicalPicture(picture);
+	loadTableData(currentChemical, currentMultiplex, currentLane, currentReplicate);
+	createTable(currentTable); // recreate the table that the website was on
+	tables.current = currentTable;
+}
+
+
+
+function setupSimilarityTableClick(index){
+	$(tables[index].tableDiv).find('tbody tr').click(function() {
+		var row_index = $(this).attr('name');
+		$('#query').val( tables[index].data[row_index]['chemical2_name'] );
+		basicDatabaseSearch(tables[index].data[row_index]['chemical2_name']);
+	});
+}
+/////////////////////////
+// LoadChemicalPicture
+// loads up the chemical picture
+//////////////////////
+function loadChemicalPicture(picture){
+	if(picture != ''){
+		$(CHEMICAL_PICTURE_DIV).html("<img src='structures/"+picture+"' height='100%' />");
+	} else {
+		$(CHEMICAL_PICTURE_DIV).html("");
+	}
+}
+
+//////////////////////////////////////////////
+// Load and unload Table Data
+function loadTableData(chemical, multiplex, lane, replicate){
+	for(var i=1; i<tables.length; i++){
+		convert_toTable(i, chemical, multiplex, lane, replicate);
+	}
+}
+// Destroy the data inside of the tables
+function unloadAllTableData(){
+	for(var i=1; i<tables.length; i++){
+		unloadTableData(i);
+	}
+}
+function unloadTableData(index){
+	$(tables[index].tableDiv).find("tbody").html("");
+}
+
+///////////////////////////////////////////////////////////
+// Fix columns
+// Fixes the header of the dataTable
+///////////////
+function fixAllDataTableHeader(){
+	for(var i=1; i<tables.length; i++){
+		fixDataTableHeader(i);
+	}
+}
+function fixDataTableHeader(index){
+	tables[index].dataTable.fnAdjustColumnSizing();
+}
+
+/////////////////////////////////////////////////////////////////
+// showTable()
+// hideTable()
+// Show or hide a table div based on what is loaded into the tables variable
+// hideAllTableDivs()
+// Hide all of the divs for the tables if they are shown.
+/////////////////////////////////////////////////////////////////
+function showTable(index){
+	$(tables[index].div).show();
+}
+function hideTable(index){
+	$(tables[index].div).hide();
+}
+function hideAllTableDivs(){
+	for(var i=1; i<tables.length; i++){
+		hideTable(i);
+	}
+	hideScatterPlots();
+}
+//////////////////////////////////////////////////////////////////
+// showTableControls()
+// hideTableControls
+// Show or hide the table controls and the tables
+function showTableControls(){
+	$(TABLE_CONTROL_DIV).show();
+	$(TABLE_DIV).show();
+	$(BOTTOM_DIV).show();
+}
+function hideTableControls(){
+	$(TABLE_CONTROL_DIV).hide();
+	$(TABLE_DIV).hide();
+	$(BOTTOM_DIV).hide();
+}
+
+/////////////////////////////////////////////////////////////////////
+// Create and destroy tables
+///////////
+function createTable(index){
+	destroyCurrentTable();
+	tables.current = index;
+	tables[index].dataTable = convertToDataTable(index, '500px');
+	hideAllTableDivs();
+	showTable(index);
+	tables[index].dataTable.fnAdjustColumnSizing()
+}
+
+function destroyTable(index){
+	if(tables[index].dataTable != ""){
+		if(tables[index].dataTable.html() != undefined){
+			tables[index].dataTable.fnDestroy();
+		}
+		tables[index].dataTable = "";
+	}
+}
+function destroyCurrentTable(){
+	if(tables.current !== ""){
+		destroyTable(tables.current);
+		tables.current = "";
+	}
+}
+function destroyAllTables(){
+	for(var i=0; i<tables.length; i++){
+		destroyTable(i);
+	}
+}
+
+////////////////
+// When the document is ready, load some custom sorting functions
+// Sorting functions
+/////////////
+$(document).ready( function(){
+	// new sorting functions 
+	jQuery.fn.dataTableExt.oSort['allnumeric-asc']  = function(a,b) {
+		if(a == "nan"){ return -1; }
+		if(b == "nan"){ return 1; }
+		var x = parseFloat(a);
+		var y = parseFloat(b);
+		return ((x < y) ? -1 : ((x > y) ?  1 : 0));
+	};
+	 
+	jQuery.fn.dataTableExt.oSort['allnumeric-desc']  = function(a,b) {
+		if(a == "nan"){ return -1; }
+		if(b == "nan"){ return 1; }
+		var x = parseFloat(a);
+		var y = parseFloat(b);
+		return ((x < y) ? 1 : ((x > y) ?  -1 : 0));
+	};
+});
+
+
+
+////////////////////////////////////////////////////////////////////////
+// convert_toTable(type, data, div, multiplex, lane, replicate)
+// This controls which of the convert to tables to use based on type
+//////////////////////////////////////////////
+function convert_toTable(index, chemical, multiplex, lane, replicate){
+	if(lane != "ALL"){ lane = 'lane'+lane;} // Minor Correction for sillyness in the database
+	switch(tables[index].type) {
+		case "SGA":
+			convert_chemicalSGAtoTable(index, multiplex, lane, replicate);
+			break;
+		case "GO":
+			convert_chemicalGOtoTable(index, multiplex, lane, replicate);
+			break;
+		case "GEN":
+			convert_chemicalGeneticstoTable(index, multiplex, lane, replicate);
+			break;
+		case "PARSONS":
+			convert_parsonstoTable(index, multiplex, lane, replicate);
+			break;
+		case "COM":
+			convert_chemicalComplextoTable(index, multiplex, lane, replicate);
+			break;
+		case "ENR":
+			convert_chemicalEnrichmenttoTable(index, multiplex, lane, replicate);
+			break;
+		case "ENRGO":
+			convert_chemicalEnrichmentGOtoTable(index, multiplex, lane, replicate);
+			break;
+		case "ENRMC":
+			convert_chemicalEnrichmentMCtoTable(index, multiplex, lane, replicate);
+			break;
+		case "SIMI":
+			convert_similaritytoTable(index, chemical, multiplex, lane, replicate);
+			break;
+		default:
+			break;
+	}
+}
+
+
+///////////////////////////////////////////////
+// These are all functions to load in the appropriate data into the tables
+// Create the tables
+///////////////////////////////////////////////
+function convert_similaritytoTable(index, chemical, multiplex, lane, replicate){
+	// Create table
+	str = "";
+
+	// Create Table
+	for (var i in tables[index].data){
+		if( (chemical == tables[index].data[i]['chemical1_name'] || chemical == "ALL") ){
+			str = str + '<tr name="'+i+'">';
+				str = str + '<td>'+tables[index].data[i]['chemical1_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical2_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['score']+'</td>';
+			str = str + '</tr>';
+		}
+	}
+
+	// Throw down table
+	$(tables[index].tableDiv).find("tbody").html(str);
+	setupSimilarityTableClick(index);
+}
+function convert_chemicalSGAtoTable(index, multiplex, lane, replicate){
+	// Create table
+	str = "";
+
+	// Create Table
+	for (var i in tables[index].data){
+		if( (multiplex == tables[index].data[i]['chemical_multiplex'] || multiplex == "ALL") && (lane == tables[index].data[i]['lane'] || lane == "ALL") && (replicate == "ALL" || replicate == tables[index].data[i]['replicate'])){
+			str = str + '<tr>';
+				str = str + '<td>'+tables[index].data[i]['chemical_name']+'</td>';
+				//str = str + '<td>'+data[i]['chemical_multiplex']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['gene_common_name']+'</td>';
+				//str = str + '<td>'+data[i]['correlation']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_value']+'</td>';
+				//str = str + '<td>'+data[i]['lane']+'</td>';
+			str = str + '</tr>';
+		}
+	}
+
+	// Throw down table
+	$(tables[index].tableDiv).find("tbody").html(str);
+}
+function convert_chemicalGOtoTable(index, multiplex, lane, replicate){
+	// Create table
+	str = '';
+
+	// Create Table
+	for (var i in tables[index].data){
+		if( (multiplex == tables[index].data[i]['chemical_multiplex'] || multiplex == "ALL") && (lane == tables[index].data[i]['lane'] || lane == "ALL") && (replicate == "ALL" || replicate == tables[index].data[i]['replicate']) ){
+			str = str + '<tr>';
+				str = str + '<td>'+tables[index].data[i]['chemical_name']+'</td>';
+				//str = str + '<td>'+data[i]['chemical_multiplex']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['GO_ID']+'</td>';
+				//str = str + '<td>'+data[i]['GO_enrichment']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['GO_description']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['ratio_in_study']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['ratio_in_pop']+'</td>';
+				//str = str + '<td>'+data[i]['p_uncorrected']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_bonferroni']+'</td>';
+				//str = str + '<td>'+data[i]['p_holm']+'</td>';
+				//str = str + '<td>'+data[i]['p_sidak']+'</td>';
+				//str = str + '<td>'+data[i]['p_fdr']+'</td>';
+				//str = str + '<td>'+data[i]['lane']+'</td>';
+			str = str + '</tr>';
+		}
+	}
+
+	// Throw down table
+	$(tables[index].tableDiv).find("tbody").html(str);
+}
+function convert_chemicalGeneticstoTable(index, multiplex, lane, replicate){
+	// Create table
+	str = '';
+
+	// Create Table
+	for (var i in tables[index].data){
+		if( (multiplex == tables[index].data[i]['chemical_multiplex'] || multiplex == "ALL") && (lane == tables[index].data[i]['lane'] || lane == "ALL") && (replicate == "ALL" || replicate == tables[index].data[i]['replicate']) ){
+			str = str + '<tr>';
+				//str = str + '<td>'+data[i]['AID']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical_name']+'</td>';
+				//str = str + '<td>'+data[i]['chemical_multiplex']+'</td>';
+				//str = str + '<td>'+data[i]['chemical_weight']+'</td>';
+				//str = str + '<td>'+data[i]['GID']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['gene_common_name']+'</td>';
+				//str = str + '<td>'+data[i]['gene_barcode']+'</td>';
+				//str = str + '<td>'+data[i]['gene_weight']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['score']+'</td>';
+				//str = str + '<td>'+data[i]['lane']+'</td>';
+			str = str + '</tr>';
+		}
+	}
+
+	// Throw down table
+	$(tables[index].tableDiv).find("tbody").html(str);
+}
+function convert_parsonstoTable(index, multiplex, lane, replicate){
+	// Create table
+	str = '';
+
+	// Create Table
+	for (var i in tables[index].data){
+		if( (multiplex == tables[index].data[i]['chemical1_multiplex'] || multiplex == tables[index].data[i]['chemical2_multiplex'] || multiplex == "ALL") && (lane == tables[index].data[i]['lane'] || lane == "ALL") && (replicate == "ALL" || replicate == tables[index].data[i]['replicate']) ){
+			str = str + '<tr>';
+				str = str + '<td>'+tables[index].data[i]['chemical1_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical1_multiplex']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical2_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical2_multiplex']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['correlation']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_value']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['lane']+'</td>';
+			str = str + '</tr>';
+		}
+	}
+
+	// Throw down table
+	$(tables[index].tableDiv).find("tbody").html(str);
+}
+function convert_chemicalComplextoTable(index, multiplex, lane, replicate){
+	// Create table
+	str = '';
+
+	// Create Table
+	for (var i in tables[index].data){
+		if( (multiplex == tables[index].data[i]['chemical_multiplex'] || multiplex == "ALL") && (lane == tables[index].data[i]['lane'] || lane == "ALL") && (replicate == "ALL" || replicate == tables[index].data[i]['replicate']) ){
+			str = str + '<tr>';
+				str = str + '<td>'+tables[index].data[i]['chemical_multiplex']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['complex_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['lane']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['z_score']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['number_genes_with_data']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['upload_date']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['cid']+'</td>';
+			str = str + '</tr>';
+		}
+	}
+
+	// Throw down table
+	$(tables[index].tableDiv).find("tbody").html(str);
+}
+function convert_chemicalEnrichmenttoTable(index, multiplex, lane, replicate){
+	// Create table
+	str = '';
+
+	// Create Table
+	for (var i in tables[index].data){
+		if( (multiplex == tables[index].data[i]['chemical_multiplex'] || multiplex == "ALL") && (lane == tables[index].data[i]['lane'] || lane == "ALL") && (replicate == "ALL" || replicate == tables[index].data[i]['replicate']) ){
+			str = str + '<tr>';
+				str = str + '<td>'+tables[index].data[i]['chemical_multiplex']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['gene_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['lane']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_value']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['upload_date']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['sensitivity_type']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['pid']+'</td>';
+			str = str + '</tr>';
+		}
+	}
+
+	// Throw down table
+	$(tables[index].tableDiv).find("tbody").html(str);
+}
+function convert_chemicalEnrichmentGOtoTable(index, multiplex, lane, replicate){
+	// Create table
+	str = '';
+
+	// Create Table
+	for (var i in tables[index].data){
+		if( (multiplex == tables[index].data[i]['chemical_multiplex'] || multiplex == "ALL") && (lane == tables[index].data[i]['lane'] || lane == "ALL") && (replicate == "ALL" || replicate == tables[index].data[i]['replicate']) ){
+			str = str + '<tr>';
+				str = str + '<td>'+tables[index].data[i]['GO_description']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['GO_enrichment']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical_multiplex']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['enrichment_type']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['id']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['lane']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['num_genes']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['num_top_genes']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['overlap_genes']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_bonferroni']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_fdr']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_holm']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_sidak']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_uncorrected']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['pid']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['ratio_in_pop']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['ratio_in_study']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['sensitivity_type']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['upload_date']+'</td>';
+			str = str + '</tr>';
+		}
+	}
+
+	// Throw down table
+	$(tables[index].tableDiv).find("tbody").html(str);
+}
+function convert_chemicalEnrichmentMCtoTable(index, multiplex, lane, replicate){
+	// Create table
+	str = '';
+
+	// Create Table
+	for (var i in tables[index].data){
+		if( (multiplex == tables[index].data[i]['chemical_multiplex'] || multiplex == "ALL") && (lane == tables[index].data[i]['lane'] || lane == "ALL") && (replicate == "ALL" || replicate == tables[index].data[i]['replicate']) ){
+			str = str + '<tr>';
+				str = str + '<td>'+tables[index].data[i]['chemical_multiplex']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['chemical_name']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['enrichment_type']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['id']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['lane']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['num_genes']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['num_top_genes']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['overlap_genes']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['p_uncorrected']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['pid']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['sensitivity_type']+'</td>';
+				str = str + '<td>'+tables[index].data[i]['upload_date']+'</td>';
+			str = str + '</tr>';
+		}
+	}
+
+	// Throw down table
+	$(tables[index].tableDiv).find("tbody").html(str);
+}
+
+
+////////////////////Working////////////////////////////////////

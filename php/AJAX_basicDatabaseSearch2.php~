@@ -1,0 +1,82 @@
+<?php
+	error_reporting(E_ALL);
+	ini_set('display_errors', '1');
+
+	require_once 'mysql.php';
+	require_once 'basicSearch_chemicalDatabase.php';
+	require_once 'getNames.php';
+
+	$doTimings = 0;
+	$timing = array();
+
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime ); $lastTime = $thisTime; }
+	// $_POST['query'] contains the raw query here, split it process it boil it salt it serve it
+	$queryString = trim(strtoupper($_POST['query']), " \t,");
+	$queryString = preg_replace('/;\w+/', ';', $queryString);
+	//$query = explode(";", str_replace(" ", "", trim(strtoupper($_POST['query']), " \t,")));
+	$query = explode(";", $queryString);
+
+	// Find where chemicals, genes and GOterms are in Query
+	$chemicals = array_safe(array_intersect($query, array_map('strtoupper', getChemicalList() ) ));
+	$genes = array_safe(array_intersect($query, array_map('strtoupper', getGeneList() ) ));
+	$GOterms = array_safe(array_intersect($query, array_map('strtoupper', getGOList() ) ));
+
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 1
+	
+	// Grab the results
+	$chemicalInfo_result = search_infoTable($chemicals);
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 2
+	$chemicalSGA_result = search_chemicalSGA($genes, $chemicals);
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 3
+	$chemicalGO_result = search_chemicalGO($chemicals, $GOterms);
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 4
+	$chemicalGenetics_result = search_chemicalGenetics($genes, $chemicals);
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 5
+	$parsons_result = search_parsons($chemicals);
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 6
+	$chemicalComplex_result = search_chemicalComplex($chemicals, 3);
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 7
+	$chemicalEnrichment_result = search_chemicalEnrichment($chemicals);
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 8
+
+	$chemicalEnrichment_sens_result = search_chemicalEnrichment($chemicals, 'sensitive');
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 9
+	$chemicalEnrichment_resi_result = search_chemicalEnrichment($chemicals, 'resistant');
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 10
+
+	$chemicalEnrichmentGO_sens_result = search_chemicalEnrichmentGO($chemicals, 'sensitive');
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 11
+	$chemicalEnrichmentGO_resi_result = search_chemicalEnrichmentGO($chemicals, 'resistant');
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 12
+
+	$chemicalEnrichmentMC_sens_result = search_chemicalEnrichmentMC($chemicals, 'sensitive');
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 13
+	$chemicalEnrichmentMC_resi_result = search_chemicalEnrichmentMC($chemicals, 'resistant');
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 14
+
+	$chemicalSimilarity_result = search_chemicalSimilarity($chemicals);
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 15
+	$profileSimilarity_result = search_profileSimilarity($chemicals);
+	if($doTimings) { $thisTime = microtime(true); array_push( $timing, $thisTime - $lastTime ); $lastTime = $thisTime; } //Timing point 16
+
+	$result = array(
+		0 => $chemicalInfo_result,
+		1 => $chemicalSGA_result,
+		2 => $chemicalGO_result,
+		3 => $chemicalGenetics_result,
+		4 => $parsons_result,
+		5 => $chemicalComplex_result,
+		6 => $chemicalEnrichment_sens_result,
+		7 => $chemicalEnrichment_resi_result,
+		8 => $chemicalEnrichmentGO_sens_result,
+		9 => $chemicalEnrichmentGO_resi_result,
+		10 => $chemicalEnrichmentMC_sens_result,
+		11 => $chemicalEnrichmentMC_resi_result,
+		12 => $chemicalSimilarity_result,
+		13 => $profileSimilarity_result
+	);
+	if($doTimings) { echo print_r($timing);} //print Timings
+	echo json_encode($result);
+
+	
+?>

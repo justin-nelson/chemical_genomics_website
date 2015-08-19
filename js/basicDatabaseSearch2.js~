@@ -1,0 +1,92 @@
+///////////////////////////////////
+// Default options for this script
+///////////////////////////////////
+showStatus = false; // This will show the status of the search in the #status div
+
+///////////////////////////////////
+// This is for memorizing a search history
+///////////////////////////////////
+searchHistory = new Array();
+
+///////////////////////////////////
+// Search History functions
+///////////////////////////////////
+function addSearchToHistory(query){
+	searchHistory.push(query);
+	trimSearchHistory();
+}
+
+function trimSearchHistory(){
+	if(searchHistory.length > 10){searchHistory.shift();}
+}
+
+///////////////////////////////////
+// checkResultsforErrors
+// Check the results of a database search, handle the error and return true
+// else return false.
+//////////////////////////////////
+function checkResultsforErrors(results){
+	if(results == "DB_CONNECT_FAILURE") { return true; }
+	if(results == "NO_SEARCH"){return true; }
+	if(results == "EMPTY"){return true; }
+	if(results == ""){return true; }
+	return false;
+}
+
+///////////////////////////////////
+// basicDatabaseSearch
+// Perform a database search of the passed query string.
+///////////////////////////////////
+function basicDatabaseSearch(query){
+	if(showStatus) {$('#status').html('Performing a search for '+query+'.')}; // This should be more indicative of what is going on.
+	
+	$.ajax({
+		url : 'php/AJAX_basicDatabaseSearch.php',
+		type : 'post',
+		data : {
+			query:query
+		},
+		success : function(answer){
+			if(showStatus) {$('#status').html('Results retrieved for '+query+', parsing tables.')};
+
+			if(answer == "DB_CONNECT_FAILURE"){}
+			else if(answer == "NO_SEARCH"){}
+			else {
+				/***************************************
+					0 => $chemicalInfo_result,	
+					1 => $chemicalSGA_result,
+					2 => $chemicalGO_result,
+					3 => $chemicalGenetics_result,
+					4 => $parsons_result,
+					5 => $chemicalComplex_result,
+					6 => $chemicalEnrichment_sens_result,
+					7 => $chemicalEnrichment_resi_result,
+					8 => $chemicalEnrichmentGO_sens_result,
+					9 => $chemicalEnrichmentGO_resi_result,
+					10 => $chemicalEnrichmentMC_sens_result
+					11 => $chemicalEnrichmentMC_resi_result
+				***************************************/
+				destroyTable(0);
+				results = eval(answer);
+
+				loadResults(results, checkResultsforErrors); // Load results
+				delete results; // Clear the results so we don't take up all that memory twice
+				setupChemicalInfoTable();
+				createTable(1);
+
+			}
+			if(showStatus) {$('#status').html('')};
+			addSearchToHistory(query);
+		}
+	});
+}
+
+
+/////////////////////////////////////////////////
+// Overridable function:loadResults
+// Used to handle the data coming from the basicDatabaseSearch
+// Overridable function:setupChemicalInfoTable
+// Sets up the chemicalInfotable
+////////////////////////
+function loadResults(results, checkFunction){ return false;};
+function setupChemicalInfoTable(){}
